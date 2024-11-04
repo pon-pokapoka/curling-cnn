@@ -319,7 +319,6 @@ std::pair<torch::Tensor, std::vector<float>> Skip::EvaluateGameState(std::vector
 
     auto policy = F::softmax(outputs->elements()[0].toTensor().reshape({size, policy_weight * policy_width * policy_rotation}).to(torch::kCPU), 1);
 
-    int size = static_cast<int>(game_states.size());
     std::vector<std::vector<float>> win_rate_array(size, std::vector<float>(kShotPerEnd+1));
 
     // if (size==1) {
@@ -342,12 +341,13 @@ std::pair<torch::Tensor, std::vector<float>> Skip::EvaluateGameState(std::vector
             if (game_states[n].IsGameOver()) {
                 win_prob[n] = team == game_states[n].game_result->winner;
             } else {
-                int scorediff_after_end = model_input.score[n];
-                if (scorediff_after_end > 9) scorediff_after_end = 9;
-                else if (scorediff_after_end < -9) scorediff_after_end = -9;
+                int scorediff = model_input.score[n];
+                if (scorediff > 9) scorediff = 9;
+                else if (scorediff < -9) scorediff = -9;
+
                 if (team == game_states[n].hammer) 
-                win_prob[n] = win_table[scorediff_after_end+9][next_end];
-                else win_prob[n] = 1 - win_table[scorediff_after_end+9][next_end];
+                win_prob[n] = win_table[scorediff+9][next_end-1];
+                else win_prob[n] = 1 - win_table[scorediff+9][next_end-1];
             }
         } else {
             for (auto i=0; i < kShotPerEnd+1; ++i){
