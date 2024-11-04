@@ -15,7 +15,7 @@ namespace utility
 
     double const one_over_to_tee = 1 / 38.405;
 
-    int const height = 64;
+    int const height = 32;
     int const width = 16;
     int const nChannel = 18;
 

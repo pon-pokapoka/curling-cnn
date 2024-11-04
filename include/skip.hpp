@@ -27,7 +27,7 @@ class Skip
         void updateParent(UctNode*, float);
 
         void SimulateMove(UctNode*, int, int);
-        std::vector<float> EvaluateGameState(std::vector<dc::GameState>, dc::GameSetting);
+        std::pair<torch::Tensor, std::vector<float>> EvaluateGameState(std::vector<dc::GameState>, dc::GameSetting);
         void EvaluateQueue();
 
         dc::Move command(const dc::GameState&);

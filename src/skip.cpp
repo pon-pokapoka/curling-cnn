@@ -1,6 +1,7 @@
 #include "skip.hpp"
 
 #include <iostream>
+#include <omp.h>
 
 #include <torch/script.h>
 #include <torch/cuda.h>
@@ -37,6 +38,7 @@ temp_game_states()
         flag_create_child[i] = false;
     }
 }
+
 
 void Skip::OnInit(dc::Team const g_team, dc::GameSetting const& game_setting, std::unique_ptr<dc::ISimulatorFactory> simulator_factory,     std::array<std::unique_ptr<dc::IPlayerFactory>, 4> player_factories,  std::array<size_t, 4> & player_order)
 {
@@ -96,21 +98,21 @@ void Skip::OnInit(dc::Team const g_team, dc::GameSetting const& game_setting, st
     for (auto i = 0; i < 10; ++i) {
         std::cout << "." << std::flush;
         std::vector<torch::jit::IValue> inputs;
-        inputs.push_back(torch::rand({nBatchSize, 18, 64, 16}, dtype).to(device));
+        inputs.push_back(torch::rand({nBatchSize, 18, 32, 16}, dtype).to(device));
 
         // Execute the model and turn its output into a tensor.
-        auto outputs = module.forward(inputs).toTensor();
-        torch::Tensor out1 = outputs.to(torch::kCPU);
+        auto outputs = module.forward(inputs).toTuple();
+        torch::Tensor out1 = outputs->elements()[0].toTensor().reshape({nBatchSize, policy_weight * policy_width * policy_rotation}).to(torch::kCPU);
     }
     std::cout << std::endl;
     for (auto i = 0; i < 10; ++i) {
         std::cout << "." << std::flush;
         std::vector<torch::jit::IValue> inputs;
-        inputs.push_back(torch::rand({1, 18, 64, 16}, dtype).to(device));
+        inputs.push_back(torch::rand({1, 18, 32, 16}, dtype).to(device));
 
         // Execute the model and turn its output into a tensor.
-        auto outputs = module.forward(inputs).toTensor();
-        torch::Tensor out1 = outputs.to(torch::kCPU);
+        auto outputs = module.forward(inputs).toTuple();
+        torch::Tensor out1 = outputs->elements()[0].toTensor().reshape({1, policy_weight * policy_width * policy_rotation}).to(torch::kCPU);
     }
     c10::cuda::CUDACachingAllocator::emptyCache();
     std::cout << std::endl;
@@ -295,7 +297,7 @@ void Skip::SimulateMove(UctNode* current_node, int index, int k)
 }
 
 
-std::vector<float> Skip::EvaluateGameState(std::vector<dc::GameState> game_states, dc::GameSetting game_setting)
+std::pair<torch::Tensor, std::vector<float>> Skip::EvaluateGameState(std::vector<dc::GameState> game_states, dc::GameSetting game_setting)
 {
     torch::NoGradGuard no_grad; 
    
@@ -309,11 +311,13 @@ std::vector<float> Skip::EvaluateGameState(std::vector<dc::GameState> game_state
 
 
 
-    auto outputs = module.forward(model_input.inputs).toTensor().to(torch::kCPU);
+    auto outputs = module.forward(model_input.inputs).toTuple();
     // now = std::chrono::system_clock::now();
     // std::cout << "Evaluate: " << std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count() << " msec" << std::endl;
 
+    int size = static_cast<int>(game_states.size());
 
+    auto policy = F::softmax(outputs->elements()[0].toTensor().reshape({size, policy_weight * policy_width * policy_rotation}).to(torch::kCPU), 1);
 
     int size = static_cast<int>(game_states.size());
     std::vector<std::vector<float>> win_rate_array(size, std::vector<float>(kShotPerEnd+1));
@@ -329,7 +333,7 @@ std::vector<float> Skip::EvaluateGameState(std::vector<dc::GameState> game_state
     // if (size!=1) std::cout << F::softmax(outputs, 1)[0] << std::endl;
 
 
-    torch::Tensor score_prob = F::softmax(outputs, 1);
+    torch::Tensor score_prob = F::softmax(outputs->elements()[1].toTensor().to(torch::kCPU), 1);
     std::vector<float> win_prob(size, 0);
 
     for (auto n=0; n < size; ++n){
@@ -374,7 +378,7 @@ std::vector<float> Skip::EvaluateGameState(std::vector<dc::GameState> game_state
     // std::cout << "Evaluate: " << std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count() << " msec" << std::endl;
 
 
-    return win_prob;
+    return std::make_pair(policy, win_prob);
 }
 
 
@@ -397,7 +401,8 @@ void Skip::EvaluateQueue()
     // torch::Tensor value = torch::rand({size});
 
     for (int i=0; i<size; ++i) {
-        queue_evaluate[i]->SetEvaluatedResults(policy[i], value[i]);
+        // std::cout << static_cast<int>(game_states[i].end) << static_cast<int>(game_states[i].shot) << std::endl;
+        queue_evaluate[i]->SetEvaluatedResults(policy_value.first.index({i}), policy_value.second[i]);
         // queue_evaluate[i]->SetFilter(utility::createFilter(game_states[i], g_game_setting));
     }
 }
@@ -413,7 +418,7 @@ dc::Move Skip::command(dc::GameState const& game_state)
     torch::NoGradGuard no_grad; 
 
     // 現在の局面を評価
-    auto current_outputs = EvaluateGameState({current_game_state}, g_game_setting);
+    auto policy_value = EvaluateGameState({current_game_state}, g_game_setting);
 
 
     auto sheet = utility::GameStateToInput({current_game_state}, g_game_setting, torch::kCPU, dtype).inputs[0].toTensor();
@@ -442,7 +447,7 @@ dc::Move Skip::command(dc::GameState const& game_state)
     // root node
     std::unique_ptr<UctNode> root_node(new UctNode());
     root_node->SetGameState(current_game_state);
-    root_node->SetEvaluatedResults(torch::rand({1, policy_weight * policy_width * policy_rotation}), current_outputs[0]);
+    root_node->SetEvaluatedResults(policy_value.first.index({0}), policy_value.second[0]);
     // root_node->SetFilter(filt);
 
     // std::cout << torch::rand({policy_rotation, policy_weight, policy_width}) * filt << std::endl;
