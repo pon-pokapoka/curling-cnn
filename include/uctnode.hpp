@@ -34,7 +34,7 @@ class UctNode
         dc::GameState GetGameState();
         void SetPolicy(torch::Tensor);
         void SetFilter(std::array<std::array<std::array<bool, policy_width>, policy_weight>, policy_rotation>);
-        void SetValue(float);
+        // void SetValue(float);
 
         torch::Tensor GetFilter();
 
@@ -45,29 +45,39 @@ class UctNode
 
         bool GetEvaluated();
 
+        torch::Tensor GetPolicy();
         float GetValue();
 
-        std::vector<Ptr> GetChildNodes();
+        std::vector<UctNode*> GetChildNodes();
         std::vector<int> GetChildIndices();
 
-        void SetCountValue(float);
+        void SetValue(float);
+        void SetCount(int);
         float GetCountValue();
+
+        int GetVisitCount();
+
+        void SetChildCountValue(int, int, float);
+
+        torch::Tensor GetChildVisitCount();
+        torch::Tensor GetChildSumValue();
 
     private:
         UctNode* parent_;
         dc::GameState       game_state_;
 
-        torch::Tensor    policy_;
-        torch::Tensor    filter_;
+        torch::Tensor       policy_;
+        torch::Tensor       filter_;
         float   value_;
 
-        int visit_count_;
-        float sum_value_;
+        int     visit_count_;
+        float   sum_value_;
 
         std::vector<Ptr>    child_nodes_;
-        // std::vector<int*>    child_visit_count_;
-        // std::vector<float*>    child_sum_value_;
         std::vector<int>    child_move_indices_;
+
+        torch::Tensor       child_visit_count_;
+        torch::Tensor       child_sum_value_;
 
         bool    simulated_;
         bool    evaluated_;

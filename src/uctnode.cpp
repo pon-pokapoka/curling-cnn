@@ -9,7 +9,9 @@ evaluated_(false),
 simulated_(false),
 value_(-1),
 visit_count_(0),
-sum_value_(0)
+sum_value_(0),
+child_visit_count_(torch::zeros({1, policy_weight*policy_width*policy_rotation}, torch::kInt)),
+child_sum_value_(torch::zeros({1, policy_weight*policy_width*policy_rotation}, torch::kFloat))
 {}
 
 void UctNode::CreateChild(int index) {
@@ -78,10 +80,10 @@ void UctNode::SetFilter(std::array<std::array<std::array<bool, policy_width>, po
     filter_ = torch::from_blob(filter.data(), {policy_rotation, policy_weight, policy_width}, torch::kInt8);
 }
 
-void UctNode::SetValue(float value)
-{
-    value_ = value;
-}
+// void UctNode::SetValue(float value)
+// {
+//     value_ = value;
+// }
 
 torch::Tensor UctNode::GetFilter()
 {
@@ -110,14 +112,23 @@ bool UctNode::GetEvaluated()
     return evaluated_;
 }
 
+torch::Tensor UctNode::GetPolicy()
+{
+    return policy_;
+}
+
 float UctNode::GetValue()
 {
     return value_;
 }
 
-std::vector<std::unique_ptr<UctNode>> UctNode::GetChildNodes()
+std::vector<UctNode*> UctNode::GetChildNodes()
 {
-    return std::move(child_nodes_);
+    std::vector<UctNode*> raw_vector;
+    for (const auto& node : child_nodes_) {
+        raw_vector.push_back(node.get());
+    }
+    return raw_vector;
 }
 
 std::vector<int> UctNode::GetChildIndices()
@@ -125,13 +136,38 @@ std::vector<int> UctNode::GetChildIndices()
     return child_move_indices_;
 }
 
-void UctNode::SetCountValue(float value)
+void UctNode::SetValue(float value)
 {
-    ++visit_count_;
     sum_value_ += value;
+}
+
+void UctNode::SetCount(int count)
+{
+    visit_count_ += count;
 }
 
 float UctNode::GetCountValue()
 {
     return sum_value_ / visit_count_;
+}
+
+int UctNode::GetVisitCount()
+{
+    return visit_count_;
+}
+
+void UctNode::SetChildCountValue(int index, int count, float value)
+{
+    child_visit_count_.index({0, index}) += count;
+    child_sum_value_.index({0, index}) += value;
+}
+
+torch::Tensor UctNode::GetChildVisitCount()
+{
+    return child_visit_count_;
+}
+
+torch::Tensor UctNode::GetChildSumValue()
+{
+    return child_sum_value_;
 }
