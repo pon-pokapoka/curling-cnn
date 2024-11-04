@@ -9,6 +9,7 @@
 
 #include "utility.hpp"
 #include "readcsv.hpp"
+#include "executablepath.hpp"
 
 namespace F = torch::nn::functional;
 
@@ -41,7 +42,24 @@ void Skip::OnInit(dc::Team const g_team, dc::GameSetting const& game_setting, st
 {
     team = g_team;
 
-    win_table = readcsv("model/win_table.csv");
+    // Retrieve and display the executable's absolute path
+    std::filesystem::path dcRootPath;
+
+    std::string execPath = getExecutablePath();
+    if (execPath.empty()) {
+        std::cerr << "Failed to retrieve executable path." << std::endl;
+        dcRootPath = "../";
+    }
+
+    std::cout << "Executable Path: " << execPath << std::endl;
+
+    // If you want to work with the path, use std::filesystem
+    std::filesystem::path execFilePath(execPath);
+    std::cout << "Executable Directory: " << execFilePath.parent_path() << std::endl;
+
+    dcRootPath = execFilePath.parent_path().parent_path();
+
+    win_table = readcsv(dcRootPath / "model" / "win_table.csv");
 
     // for (const auto& row : win_table) {
     //     for (const auto& value : row) {
@@ -64,7 +82,7 @@ void Skip::OnInit(dc::Team const g_team, dc::GameSetting const& game_setting, st
     try {
         // Deserialize the ScriptModule from a file using torch::jit::load().
         std::cout << "model loading..." << std::endl;
-        module = torch::jit::load("model/traced_curling_shotpyshot_v2_score-008.pt", device);
+        module = torch::jit::load(dcRootPath / "model" / "traced_fixsize_lighttest+shotbyshot_1-010.pt", device);
         module.to(dtype);
         std::cout << "model loaded" << std::endl;
     }
