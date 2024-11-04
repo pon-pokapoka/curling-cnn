@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.6.0-cudnn-devel-ubuntu24.04
+FROM nvidia/cuda:12.6.2-cudnn-devel-ubuntu24.04
 
 SHELL ["/bin/bash", "-c"]
 
@@ -18,7 +18,7 @@ RUN apt update && apt install -y\
     wget\
     && rm -rf /var/lib/apt/lists/*
 
-ARG TORCH_VERSION=2.4.1
+ARG TORCH_VERSION=2.5.1
 ARG CUDA_VERSION=124
 RUN wget https://download.pytorch.org/libtorch/cu${CUDA_VERSION}/libtorch-cxx11-abi-shared-with-deps-${TORCH_VERSION}%2Bcu${CUDA_VERSION}.zip\
     && unzip libtorch-cxx11-abi-shared-with-deps-${TORCH_VERSION}+cu${CUDA_VERSION}.zip -d /usr/local\
