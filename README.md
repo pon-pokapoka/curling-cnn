@@ -31,8 +31,8 @@ git submodule update --init --recursive
 
 mkdir build
 cd build
-cmake -DCMAKE_BUILD_TYPE=Debug ..
-cmake --build . --config Debug
+cmake -DCMAKE_BUILD_TYPE=Release ..
+cmake --build . --config Release
 ```
 
 ## Usage
