@@ -1,27 +1,15 @@
 #ifndef UTILITY_HPP
 #define UTILITY_HPP
 
+#include "config.hpp"
 #include "digitalcurling3/digitalcurling3.hpp"
 
 namespace dc = digitalcurling3;
 
+using namespace config;
 
 namespace utility
 {
-
-    double const dpi = 1/16.;
-    double const ipd = 16;
-    double const m_to_inch = 1/0.0254;
-
-    double const one_over_to_tee = 1 / 38.405;
-
-    int const height = 32;
-    int const width = 16;
-    int const nChannel = 18;
-
-    int const policy_weight = 16;
-    int const policy_width = 32;
-    int const policy_rotation = 2;
 
 
     // ストーンの座標からシートの画像のピクセルに変換する
@@ -39,7 +27,7 @@ namespace utility
     // policyの画像のピクセルからショットの速度に変換する
     dc::Vector2 PixelToVelocity(int i, int j)
     {
-        std::array<float, policy_weight> velocity_array{{2.22, 2.26, 2.3,
+        std::array<float, policy_weight> velocity_array{{2.23, 2.27, 2.31,
             2.35, 2.37, 2.385, 2.4, 2.415, 2.43, 2.45,
             2.485, 2.535, 2.6, 3., 3.4, 3.8,}};
 

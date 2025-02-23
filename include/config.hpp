@@ -20,6 +20,17 @@ namespace config {
     int const policy_weight = 16;
     int const policy_width = 32;
     int const policy_rotation = 2;
+
+    double const dpi = 1/16.;
+    double const ipd = 16;
+    double const m_to_inch = 1/0.0254;
+
+    double const one_over_to_tee = 1 / 38.405;
+
+    int const height = 32;
+    int const width = 16;
+    int const nChannel = 18;
+
 }
 
 #endif // CONFIG_HPP
