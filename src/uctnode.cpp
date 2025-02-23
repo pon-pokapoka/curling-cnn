@@ -3,23 +3,24 @@
 UctNode::UctNode():
 parent_(nullptr),
 game_state_(),
-child_nodes_(),
-child_move_indices_(),
+indices_(std::make_pair(-1, -1)),
 evaluated_(false),
 simulated_(false),
 value_(-1),
 visit_count_(0),
 sum_value_(0),
+child_nodes_(),
+child_node_addresses_({}),
 child_visit_count_(torch::zeros({1, policy_weight*policy_width*policy_rotation}, torch::kInt)),
 child_sum_value_(torch::zeros({1, policy_weight*policy_width*policy_rotation}, torch::kFloat))
 {}
 
-void UctNode::CreateChild(int index) {
+void UctNode::CreateChild(std::pair<int, int> indices) {
     std::unique_ptr<UctNode> child(new UctNode());
     child->parent_ = this;
+    child->indices_ = indices;
+    child_node_addresses_[indices.first][indices.second] = child.get();
     child_nodes_.push_back(std::move(child));
-
-    child_move_indices_.push_back(index);
 }
 
 // void UctNode::expandChild(int childData) {
@@ -41,16 +42,9 @@ void UctNode::CreateChild(int index) {
 //     }
 // }
 
-UctNode* UctNode::GetChild(int index)
+UctNode* UctNode::GetChild(std::pair<int, int> indices)
 {
-    auto it = std::find(child_move_indices_.begin(), child_move_indices_.end(), index);
-
-    return child_nodes_[it - child_move_indices_.begin()].get();
-}
-
-UctNode* UctNode::GetChildById(int index)
-{
-    return child_nodes_[index].get();
+    return child_node_addresses_[indices.first][indices.second];
 }
 
 
@@ -70,10 +64,12 @@ dc::GameState UctNode::GetGameState()
     return game_state_;
 }
 
+
 void UctNode::SetPolicy(torch::Tensor policy)
 {
     policy_ = policy;
 }
+
 
 void UctNode::SetFilter(std::array<std::array<std::array<bool, policy_width>, policy_weight>, policy_rotation> filter)
 {
@@ -122,18 +118,9 @@ float UctNode::GetValue()
     return value_;
 }
 
-std::vector<UctNode*> UctNode::GetChildNodes()
+std::array<std::array<UctNode*, nSimulation>, policy_weight*policy_width*policy_rotation> UctNode::GetChildNodeAddresses()
 {
-    std::vector<UctNode*> raw_vector;
-    for (const auto& node : child_nodes_) {
-        raw_vector.push_back(node.get());
-    }
-    return raw_vector;
-}
-
-std::vector<int> UctNode::GetChildIndices()
-{
-    return child_move_indices_;
+    return child_node_addresses_;
 }
 
 void UctNode::SetValue(float value)
@@ -170,4 +157,10 @@ torch::Tensor UctNode::GetChildVisitCount()
 torch::Tensor UctNode::GetChildSumValue()
 {
     return child_sum_value_;
+}
+
+
+std::pair<int, int> UctNode::GetIndices()
+{
+    return indices_;
 }

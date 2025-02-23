@@ -235,7 +235,7 @@ float Skip::search(UctNode* current_node, int k)
 
         auto indices = std::get<1>(torch::topk(ucb_value, 1));
 
-        auto child_indices = current_node->GetChildIndices();
+        // auto child_indices = current_node->GetChildIndices();
 
         // std::vector<int> matching_indices;
         // for (auto it = child_indices.begin(); it != child_indices.end(); ++it) {
@@ -255,18 +255,28 @@ float Skip::search(UctNode* current_node, int k)
         //     it = child_indices.end();
         // }
 
-        auto it = std::find(child_indices.begin(), child_indices.end(), indices.index({0, 0}).item<int>());
+        // auto it = std::find(child_indices.begin(), child_indices.end(), indices.index({0, 0}).item<int>());
         
         // if (omp_get_thread_num() == 0) std::cout << indices.index({0, 0}).item<int>() << "  " << std::endl;
 
-        if ((it == child_indices.end()) || (current_node->GetChildVisitCount().index({0, indices.index({0, 0}).item<int>()}).item<int>() < expand_threshold) || (current_node->GetGameState().shot == kShotPerEnd)) {
+        auto next_node = current_node->GetChild(std::make_pair(
+                indices.index({0, 0}).item<int>(),
+                current_node->GetChildVisitCount().index({0, indices.index({0, 0}).item<int>()}).item<int>() % nSimulation
+            ));
+
+        // std::cout << indices.index({0, 0}).item<int>() << "  " << current_node->GetChildVisitCount().index({0, indices.index({0, 0}).item<int>()}).item<int>() % nSimulation << "  " << next_node << std::endl; 
+
+        if (!(next_node) || (current_node->GetChildVisitCount().index({0, indices.index({0, 0}).item<int>()}).item<int>() < expand_threshold) || (current_node->GetGameState().shot == kShotPerEnd)) {
             queue_create_child[k] = current_node;
-            queue_create_child_index[k] = indices.index({0, 0}).item<int>();
+            queue_create_child_index[k] = std::make_pair(
+                indices.index({0, 0}).item<int>(),
+                current_node->GetChildVisitCount().index({0, indices.index({0, 0}).item<int>()}).item<int>() % nSimulation
+            );
             flag_create_child[k] = true;
             SimulateMove(current_node, queue_create_child_index[k], k);
 
         } else {
-            auto next_node = current_node->GetChild(indices.index({0, 0}).item<int>());
+            
             if (next_node->GetEvaluated()) result = next_node->GetValue();
             // else {
             //     queue_create_child[k] = current_node;
@@ -283,19 +293,12 @@ float Skip::search(UctNode* current_node, int k)
 }
 
 
-void Skip::searchById(UctNode* current_node, int k, int index)
+void Skip::searchById(UctNode* current_node, int k, std::pair<int, int> indices)
 {
-    auto child_indices = current_node->GetChildIndices();
-
-    // auto it = std::find(child_indices.begin(), child_indices.end(), index);
-
-    // if (it == child_indices.end()) {
-        queue_create_child[k] = current_node;
-        queue_create_child_index[k] = index;
-        flag_create_child[k] = true;
-        SimulateMove(current_node, queue_create_child_index[k], k);
-
-    // }
+    queue_create_child[k] = current_node;
+    queue_create_child_index[k] = indices;
+    flag_create_child[k] = true;
+    SimulateMove(current_node, queue_create_child_index[k], k);
 
 }
 
@@ -306,11 +309,8 @@ void Skip::updateParent(UctNode* node, float value)
         node->GetParent()->SetValue(value);
         node->GetParent()->SetCount(1);
 
-        auto parent_child_nodes = node->GetParent()->GetChildNodes();
 
-        auto it = std::find(parent_child_nodes.begin(), parent_child_nodes.end(), node);
-
-        node->GetParent()->SetChildCountValue(node->GetParent()->GetChildIndices()[it - parent_child_nodes.begin()], 1, value);
+        node->GetParent()->SetChildCountValue(node->GetIndices().first, 1, value);
 
         updateParent(node->GetParent(), value);
     }
@@ -328,22 +328,19 @@ void Skip::updateNodes()
 }
 
 
-void Skip::updateCount(UctNode* node, int index, int count)
+void Skip::updateCount(UctNode* node, std::pair<int, int> indices, int count)
 {
     node->SetCount(count);
 
-    node->SetChildCountValue(index, count, 0);
+    node->SetChildCountValue(indices.first, count, 0);
 
     if (node->GetParent()) {
-        auto parent_child_nodes = node->GetParent()->GetChildNodes();
-        auto it = std::find(parent_child_nodes.begin(), parent_child_nodes.end(), node);
-
-        updateCount(node->GetParent(), node->GetParent()->GetChildIndices()[it - parent_child_nodes.begin()], count);
+        updateCount(node->GetParent(), node->GetIndices(), count);
     }
 }
 
 
-void Skip::SimulateMove(UctNode* current_node, int index, int k)
+void Skip::SimulateMove(UctNode* current_node, std::pair<int, int> indices, int k)
 {
     dc::Move temp_move;
     dc::moves::Shot shot;
@@ -352,10 +349,10 @@ void Skip::SimulateMove(UctNode* current_node, int index, int k)
 
     temp_game_states[k] = current_node->GetGameState();
 
-    velocity = utility::PixelToVelocity(index % (policy_weight * policy_width) / policy_width, index % (policy_weight * policy_width) % policy_width);
+    velocity = utility::PixelToVelocity(indices.first % (policy_weight * policy_width) / policy_width, indices.first % (policy_weight * policy_width) % policy_width);
 
-    if (index / (policy_weight * policy_width) == 0) shot = {velocity, dc::moves::Shot::Rotation::kCW};
-    else if (index / (policy_weight * policy_width) == 1) shot = {velocity, dc::moves::Shot::Rotation::kCCW};
+    if (indices.first / (policy_weight * policy_width) == 0) shot = {velocity, dc::moves::Shot::Rotation::kCW};
+    else if (indices.first / (policy_weight * policy_width) == 1) shot = {velocity, dc::moves::Shot::Rotation::kCCW};
     else std::cerr << "shot error!";
 
     auto & current_player = *g_players[temp_game_states[k].shot / 4];
@@ -455,17 +452,28 @@ std::pair<torch::Tensor, std::vector<float>> Skip::EvaluateGameState(std::vector
 void Skip::EvaluateQueue()
 {       
     int size = static_cast<int>(queue_evaluate.size());
-    std::vector<dc::GameState> game_states;
-    game_states.resize(size);
+    // std::cout << "Size: " << size << std::endl;
 
-    #pragma omp parallel for
+    std::vector<dc::GameState> game_states;
+    // game_states.resize(size);
+
+    // #pragma omp parallel for
+    // for (auto i=0; i<size; ++i) {
+    //     // std::cout << queue_evaluate[i]->GetIndices().first << "  " << queue_evaluate[i]->GetIndices().second << std::endl;
+    //     game_states[i] = queue_evaluate[i]->GetGameState();
+    // }
+
     for (auto i=0; i<size; ++i) {
-        game_states[i] = queue_evaluate[i]->GetGameState();
+        // std::cout << queue_evaluate[i]->GetIndices().first << "  " << queue_evaluate[i]->GetIndices().second << "  ";
+        // std::cout << queue_evaluate[i] << std::endl;
+        game_states.push_back(queue_evaluate[i]->GetGameState());
     }
 
+    // std::cout << "Get Game State" << std::endl;
 
     auto policy_value = EvaluateGameState(game_states, g_game_setting);
 
+    // std::cout << "Evaluate Game State" << std::endl;
 
     // torch::Tensor policy = torch::rand({size, policy_weight * policy_width * policy_rotation}).to(torch::kCPU);
     // torch::Tensor value = torch::rand({size});
@@ -475,6 +483,8 @@ void Skip::EvaluateQueue()
         queue_evaluate[i]->SetEvaluatedResults(policy_value.first.index({i}), policy_value.second[i]);
         // queue_evaluate[i]->SetFilter(utility::createFilter(game_states[i], g_game_setting));
     }
+
+    // std::cout << "Set Evaluated Results" << std::endl;
 }
 
 
@@ -544,7 +554,7 @@ dc::Move Skip::command(dc::GameState const& game_state)
             if (count >= policy_rotation*policy_weight*policy_width*nSimulation) break;
             #pragma omp parallel for
             for (auto i = 0; i < nBatchSize; ++i) {
-                searchById(root_node.get(), i, (count + i) % (policy_rotation*policy_weight*policy_width));
+                searchById(root_node.get(), i, std::make_pair((count + i) % (policy_rotation*policy_weight*policy_width), (count + i) / (policy_rotation*policy_weight*policy_width)));
 
                 if (flag_create_child[i]) {
                     updateCount(queue_create_child[i], queue_create_child_index[i], virtual_loss);
@@ -573,6 +583,7 @@ dc::Move Skip::command(dc::GameState const& game_state)
         a = std::chrono::system_clock::now();
         for (auto i = 0; i < nLoop; ++i) {
             if (flag_create_child[i]) {
+                // std::cout << queue_create_child_index[i].first << "  " << queue_create_child_index[i].second << std::endl;
                 queue_create_child[i]->CreateChild(queue_create_child_index[i]);
                 queue_create_child[i]->GetChild(queue_create_child_index[i])->SetGameState(temp_game_states[i]);
 
@@ -580,6 +591,10 @@ dc::Move Skip::command(dc::GameState const& game_state)
 
                 if (queue_evaluate.size() < nBatchSize) {
                     queue_evaluate.push_back(queue_create_child[i]->GetChild(queue_create_child_index[i]));
+                    // std::cout << i << ":  ";
+                    // std::cout << queue_create_child_index[i].first << "  " << queue_create_child_index[i].second << ";  ";
+                    // std::cout << queue_create_child[i]->GetChild(queue_create_child_index[i])->GetIndices().first << "  " << queue_create_child[i]->GetChild(queue_create_child_index[i])->GetIndices().second << ";  ";
+                    // std::cout << queue_create_child[i]->GetChild(queue_create_child_index[i]) << std::endl;
                 }
             }
         }
@@ -593,6 +608,7 @@ dc::Move Skip::command(dc::GameState const& game_state)
         for (auto i=0; i < nLoop; ++i) {
             flag_create_child[i] = false;
         }
+
 
         a = std::chrono::system_clock::now();
 
@@ -682,16 +698,16 @@ dc::Move Skip::command(dc::GameState const& game_state)
     //     }
     // }
 
-    // for (auto i=0; i < policy_rotation; ++i){
-    //     for (auto j=0; j < policy_weight; ++j) {
-    //         for (auto k=0; k < policy_width; ++k) {
-    //             // std::cout << std::setw(2) << std::setfill('0') << std::setprecision(0) << static_cast<int>((torch::where(root_node->GetChildVisitCount() > 0, root_node->GetChildSumValue() / root_node->GetChildVisitCount(), 0) + policy_value.first).index({0, utility::Id3d1d(i, j, k)}).item<float>() * 100) << " ";
-    //             std::cout << std::setw(2) << std::setfill('0') << std::setprecision(0) << static_cast<int>(root_node->GetChildVisitCount().index({0, utility::Id3d1d(i, j, k)}).item<int>()) << " ";
-    //         }
-    //         std::cout << std::endl;
-    //     }
-    //     std::cout << std::endl;
-    // }
+    for (auto i=0; i < policy_rotation; ++i){
+        for (auto j=0; j < policy_weight; ++j) {
+            for (auto k=0; k < policy_width; ++k) {
+                std::cout << std::setw(2) << std::setfill('0') << std::setprecision(0) << static_cast<int>((torch::where(root_node->GetChildVisitCount() > 0, root_node->GetChildSumValue() / root_node->GetChildVisitCount(), 0) + policy_value.first).index({0, utility::Id3d1d(i, j, k)}).item<float>() * 100) << " ";
+                // std::cout << std::setw(2) << std::setfill('0') << std::setprecision(0) << static_cast<int>(root_node->GetChildVisitCount().index({0, utility::Id3d1d(i, j, k)}).item<int>()) << " ";
+            }
+            std::cout << std::endl;
+        }
+        std::cout << std::endl;
+    }
 
 
 

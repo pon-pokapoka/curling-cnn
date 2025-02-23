@@ -5,14 +5,12 @@
 #include <torch/cuda.h>
 #include <vector>
 
+#include "config.hpp"
 #include "digitalcurling3/digitalcurling3.hpp"
 
 namespace dc = digitalcurling3;
 
-int const policy_weight = 16;
-int const policy_width = 32;
-int const policy_rotation = 2;
-
+using namespace config;
 
 class UctNode
 {
@@ -21,13 +19,12 @@ class UctNode
 
     public:
         UctNode();
-        void    CreateChild(int);
+        void    CreateChild(std::pair<int, int>);
         // void    expandChild(int);
         // void    resetAsRoot();
         // void    removeChild(Ptr);
 
-        UctNode* GetChild(int);
-        UctNode* GetChildById(int);
+        UctNode* GetChild(std::pair<int, int>);
         UctNode* GetParent();
 
         void SetGameState(dc::GameState);
@@ -48,8 +45,7 @@ class UctNode
         torch::Tensor GetPolicy();
         float GetValue();
 
-        std::vector<UctNode*> GetChildNodes();
-        std::vector<int> GetChildIndices();
+        std::array<std::array<UctNode*, nSimulation>, policy_weight*policy_width*policy_rotation> GetChildNodeAddresses();
 
         void SetValue(float);
         void SetCount(int);
@@ -62,9 +58,12 @@ class UctNode
         torch::Tensor GetChildVisitCount();
         torch::Tensor GetChildSumValue();
 
+        std::pair<int, int> GetIndices();
+
     private:
         UctNode* parent_;
         dc::GameState       game_state_;
+        std::pair<int, int> indices_;
 
         torch::Tensor       policy_;
         torch::Tensor       filter_;
@@ -74,7 +73,7 @@ class UctNode
         float   sum_value_;
 
         std::vector<Ptr>    child_nodes_;
-        std::vector<int>    child_move_indices_;
+        std::array<std::array<UctNode*, nSimulation>, policy_weight*policy_width*policy_rotation>    child_node_addresses_;
 
         torch::Tensor       child_visit_count_;
         torch::Tensor       child_sum_value_;
