@@ -2,7 +2,7 @@
 #define CONFIG_HPP
 
 namespace config {
-    const int nSimulation = 8; // 1つのショットに対する誤差を考慮したシミュレーション回数
+    const int nSimulation = 4; // 1つのショットに対する誤差を考慮したシミュレーション回数
     const int nBatchSize = 512; // CNNで推論するときのバッチサイズ
     const int nLoop = 1024; // 
     // const int nCandidate = 10000; // シミュレーションするショットの最大数。制限時間でシミュレーションできる数よりも十分大きく取る
@@ -14,7 +14,7 @@ namespace config {
 
     const int expand_threshold = nSimulation; // max value of number of simulation for each child node
 
-    const int min_visit = 6; // minimum number of visit for each child node to select move
+    const int min_visit = 4; // minimum number of visit for each child node to select move
 
 
     int const policy_weight = 16;

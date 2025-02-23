@@ -698,16 +698,16 @@ dc::Move Skip::command(dc::GameState const& game_state)
     //     }
     // }
 
-    for (auto i=0; i < policy_rotation; ++i){
-        for (auto j=0; j < policy_weight; ++j) {
-            for (auto k=0; k < policy_width; ++k) {
-                std::cout << std::setw(2) << std::setfill('0') << std::setprecision(0) << static_cast<int>((torch::where(root_node->GetChildVisitCount() > 0, root_node->GetChildSumValue() / root_node->GetChildVisitCount(), 0) + policy_value.first).index({0, utility::Id3d1d(i, j, k)}).item<float>() * 100) << " ";
-                // std::cout << std::setw(2) << std::setfill('0') << std::setprecision(0) << static_cast<int>(root_node->GetChildVisitCount().index({0, utility::Id3d1d(i, j, k)}).item<int>()) << " ";
-            }
-            std::cout << std::endl;
-        }
-        std::cout << std::endl;
-    }
+    // for (auto i=0; i < policy_rotation; ++i){
+    //     for (auto j=0; j < policy_weight; ++j) {
+    //         for (auto k=0; k < policy_width; ++k) {
+    //             std::cout << std::setw(2) << std::setfill('0') << std::setprecision(0) << static_cast<int>((torch::where(root_node->GetChildVisitCount() > 0, root_node->GetChildSumValue() / root_node->GetChildVisitCount(), 0) + policy_value.first).index({0, utility::Id3d1d(i, j, k)}).item<float>() * 100) << " ";
+    //             // std::cout << std::setw(2) << std::setfill('0') << std::setprecision(0) << static_cast<int>(root_node->GetChildVisitCount().index({0, utility::Id3d1d(i, j, k)}).item<int>()) << " ";
+    //         }
+    //         std::cout << std::endl;
+    //     }
+    //     std::cout << std::endl;
+    // }
 
 
 
